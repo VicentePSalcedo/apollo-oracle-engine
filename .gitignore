@@ -4,3 +4,4 @@
 log/
 requirements.txt
 src/__pycache__
+.env
