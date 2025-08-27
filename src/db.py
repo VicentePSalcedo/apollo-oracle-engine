@@ -18,3 +18,27 @@ def get_db_connection():
     except psycopg2.OperationalError as e:
         log_error(f"Could not connect to the databse: {e}")
         return None
+
+def setup_db_tables(conn):
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS companies (
+                corporation_number TEXT PRIMARY KEY,
+                corporation_name VARCHAR(255) NOT NULL,
+                category VARCHAR(100),
+                email VARCHAR(255),
+                facebook_url VARCHAR(255),
+                phone_number VARCHAR(20),
+                contacted BOOLEAN DEFAULT FALSE,
+                unsubscribed BOOLEAN DEFAULT FALSE
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS processed_files (
+                filename TEXT PRIMARY KEY,
+                status VARCHAR(20) NOT NULL,
+                processed_at TIMESTAMPTZ NOT NULL
+            );
+        """)
+        conn.commit()
+    log_info("All database tables are ready.")

@@ -1,5 +1,6 @@
 # from src.logger import log_error, log_info
-from src.db import get_db_connection
+from src.db import get_db_connection, setup_db_tables
 
 if __name__ == "__main__":
-    connection = get_db_connection()
+    conn = get_db_connection()
+    setup_db_tables(conn)
