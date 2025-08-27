@@ -1,0 +1,6 @@
+.direnv/
+.envrc
+.venv/
+log/
+requirements.txt
+src/__pycache__
