@@ -1,14 +1,15 @@
+import asyncio
 from os import getenv, path
 from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
-from time import sleep
 
 from src.logger import log_error, log_info
 from src.db import get_db_connection, has_file_processed, mark_corp_contacted, setup_db_tables, get_uncontacted_corps, update_file_status
 from src.sunbiz_fetcher import download_sunbiz_file
 from src.sunbiz_parser import parse_sunbiz_file
 from src.corporation_categorizer import categorize_corporations
-from src.lead_qualifier import qualify_leads_sequentially
+from src.lead_qualifier import qualify_leads_sequentially, qualfiy_leads_in_parallel
+
 
 load_dotenv()
 
@@ -22,14 +23,23 @@ def main_workflow(conn, input_file_path):
     categorize_corporations(conn)
 
     log_info("Qualifying new categorized leads.")
-    qualify_leads_sequentially(conn)
+    asyncio.run(qualify_leads_sequentially(conn))
+    # qualfiy_leads_in_parallel(conn)
     
     log_info(f"{input_file_path} processed")
     return
 
 if __name__ == "__main__":
+
     conn = get_db_connection()
+    if not conn:
+        exit(1)
     setup_db_tables(conn)
+
+    TARGET = getenv("TARGET")
+    if not TARGET:
+        log_error("Missing TARGET environment variable.")
+        exit(1)
 
     YEAR = getenv("YEAR")
     MONTH = getenv("MONTH")
@@ -38,18 +48,13 @@ if __name__ == "__main__":
         log_error("Missing one or more required environment variables: YEAR, MONTH, DAY")
         exit(1)
 
+    TEST_EMAIL = getenv("TEST_EMAIL")
+    if not TEST_EMAIL:
+        log_error("TEST_EMAIL IS NOT SET. RUNNING IN PRODUCTION")
+
     current_date = datetime(int(YEAR), int(MONTH), int(DAY)).date()
     today = date.today()
     emails_sent = 0
-
-    TARGET = getenv("TARGET")
-    if not TARGET:
-        log_error("Missing TARGET environment variable.")
-        exit(1)
-
-    TEST_EMAIL = getenv("TEST_EMAIL")
-    if not TEST_EMAIL:
-        log_info("TEST_EMAIL IS NOT SET. RUNNING IN PRODUCTION")
 
     while emails_sent < int(TARGET) and current_date <= today:
         uncontacted_corps = get_uncontacted_corps(conn)

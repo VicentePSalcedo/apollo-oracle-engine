@@ -5,6 +5,7 @@ down:
 
 monitor:
     docker compose logs -f app
+
 reset:
     docker-compose down -v
 

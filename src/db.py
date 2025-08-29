@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 from os import getenv
+
+from .logger import log_info, log_error
+
 import psycopg2
 import psycopg2.extras
 from psycopg2 import sql
-
-from .logger import log_info, log_error
 
 def get_db_connection():
     try:
@@ -110,7 +111,7 @@ def insert_company(conn, data):
             data['unsubscribed']
         ))
         conn.commit()
-        log_info(f"Inserted or ignored company: {data['name']}")
+        # log_info(f"Inserted or ignored company: {data['name']}")
         cur.close()
     except psycopg2.Error as e:
         log_error(f"Error inserting data: {e}")
@@ -119,7 +120,6 @@ def insert_company(conn, data):
 def get_uncategorized_corps(conn):
     uncategorized_corporations = []
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        # Selects companies where the category column is NULL
         sql_query = """
             SELECT 
                 corporation_number, 
