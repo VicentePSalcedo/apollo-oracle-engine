@@ -1,0 +1,7 @@
+- [ ] ensure that bcc is enabled for first email batches
+- [ ] ensure that corporations are not being qualified twice
+- [ ] ensure the subject line is correct
+- [ ] ensure business is being replaced correctly in the email body
+- [ ] ensure that the dockerfile is using the proper cron tab setup
+  - [ ] run crontabe tests
+- [ ] move hard coded solutions to .env file or otherwise remove them before commitin them to a public github repo

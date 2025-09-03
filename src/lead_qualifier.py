@@ -1,104 +1,171 @@
-import concurrent.futures
-from time import sleep
+import asyncio
+from os import getenv
 from random import choice
 from urllib.parse import quote
+from re import compile
 
-from .db import get_listed_corporations
+from .db import get_listed_corporations, update_company_async
 from .logger import log_info, log_error
 
-from playwright.async_api import async_playwright, Playwright, Error as PlaywrightError
+from playwright.async_api import async_playwright, Playwright, Error as PlaywrightError, TimeoutError
 from playwright_stealth import Stealth
 
-proxies_list = [
-    "http://23.95.150.145:6114/",
-    "http://23.95.150.145:6114",
-    "http://198.23.239.134:6540",
-    "http://45.38.107.97:6014",
-    "http://107.172.163.27:6543",
-    "http://64.137.96.74:6641",
-    "http://45.43.186.39:6257",
-    "http://154.203.43.247:5536",
-    "http://216.10.27.159:6837",
-    "http://136.0.207.84:6661",
-    "http://142.147.128.93:6593",
-]
+MAX_RETRIES = 10
 
-async def qualify_leads_sequentially(conn):
-    listed_corporations = get_listed_corporations(conn)
-    for corp in listed_corporations:
+def load_proxies_from_env():
+    PROXIES_STRING = getenv("PROXY_LIST")
+    if not PROXIES_STRING:
+        log_info("Missing PROXIES_STRING environment variable.")
+        exit(0)
+    return PROXIES_STRING.split(',')
+
+proxies_list = load_proxies_from_env() 
+
+# async def qualify_leads_sequentially(conn):
+#     listed_corporations = get_listed_corporations(conn)
+#     for corp in listed_corporations:
+#         async with Stealth().use_async(async_playwright()) as p:
+#             await qualify_lead_playwright(corp, p)
+#     return
+
+async def worker(corp, semaphore):
+    # corp_name = corp['corporation_name']
+    async with semaphore:
+        # log_info(f"Semaphore acquired for {corp_name}.")
         async with Stealth().use_async(async_playwright()) as p:
             await qualify_lead_playwright(corp, p)
-        sleep(10)
+        # log_info(f"Semaphore released for {corp_name}")
+
+async def qualify_leads_in_parallel(conn):
+    max_workers = 5
+    delay_between_tasks = 2
+    semaphore = asyncio.Semaphore(max_workers)
+    listed_corporations = get_listed_corporations(conn)
+    # tasks = [worker(corp, semaphore) for corp in listed_corporations]
+    tasks = []
+    for corp in listed_corporations:
+        task = asyncio.create_task(worker(corp, semaphore))
+        tasks.append(task)
+        await asyncio.sleep(delay_between_tasks)
+    await asyncio.gather(*tasks)
+    log_info("\nAll leads have been qualified at a paced rate.")
     return
 
-def qualfiy_leads_in_parallel(conn):
-    listed_corporations = get_listed_corporations(conn)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(proxies_list)) as executor:
-        executor.map(qualify_lead_playwright, listed_corporations)
-
-async def qualify_lead_playwright(corp: dict, p: Playwright):
+async def extract_email_from_facebook_page(corp, url, page):
     corp_name = corp['corporation_name']
+    corp_num = corp['corporation_number']
+    email_regex = compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}') 
+
+    for attempt in range(MAX_RETRIES):
+
+        log_info(f"Attempt {attempt + 1} of {MAX_RETRIES} to find email on facebook page.")
+
+        try:
+            await page.goto(url, timeout=30000)
+            email_locator = page.get_by_text(email_regex)
+            await email_locator.wait_for()
+            email_address = await email_locator.inner_text()
+
+            log_info(f"Email for {corp_name} is: {email_address}")
+
+            success = await update_company_async(corp_num, email=email_address, facebook_url=url, contacted=False, unsubscribed=False)
+            if success:
+                break
+
+        except TimeoutError:
+            log_error(f"Timeout while trying to load Facebook about page: {url}")
+            # if page:
+            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
+            #     await page.screenshot(path=screenshot_path)
+            #     log_error(f"Screenshot saved to {screenshot_path}")
+            #     exit(0)
+        except Exception as e:
+            log_error(f"An error occurred on Facebook page {url}: {e}")
+            # if page:
+            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
+            #     await page.screenshot(path=screenshot_path)
+            #     log_error(f"Screenshot saved to {screenshot_path}")
+            #     exit(0)
+
+async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
+    corp_name = corp['corporation_name']
+
     log_info(f"Processing {corp_name} with Playwright")
 
     query = f"{corp_name} Florida"
     search_url = f"https://duckduckgo.com/?q={quote(query)}"
     browser = None
+    current_proxy = choice(proxies_list)
 
-    while True:
-        current_proxy = choice(proxies_list)
-        log_info(f"Attempting connection with proxy: {current_proxy}")
+    WEBSHARE_USERNAME = getenv("WEBSHARE_USERNAME")
+    if not WEBSHARE_USERNAME:
+        log_error("Missing WEBSHARE_USERNAME environment variable.")
+        exit(0)
+
+    WEBSHARE_PASSWORD = getenv("WEBSHARE_PASSWORD")
+    if not WEBSHARE_PASSWORD :
+        log_error("Missing WEBSHARE_PASSWORD environment variable.")
+        exit(0)
+
+    for attempt in range(MAX_RETRIES):
+        log_info(f"Attempt {attempt + 1} of {MAX_RETRIES} to qualify lead with proxy: {current_proxy}")
 
         page = None
 
         try:
             browser = await p.chromium.launch(
                 headless=True,
-                # proxy={
-                #     "server": current_proxy,
-                #     "username": "sintrasensei",
-                #     "password": "eexpc14rdl7u",
-                # },
+                proxy={
+                    "server": current_proxy,
+                    "username": WEBSHARE_USERNAME,
+                    "password": WEBSHARE_PASSWORD
+                }
             )
             page = await browser.new_page()
             await page.goto(search_url, timeout=30000) # 30-second timeout
-            log_info(f"Page visted: {page}")
-            web_content_wrapper_locator = page.locator('#react-layout > div > div > div')
-            await web_content_wrapper_locator.wait_for()
-            section_locator = web_content_wrapper_locator.locator('section:nth-child(1)')
-            await section_locator.wait_for()
-            log_info(await section_locator.inner_text())
-            link_locator = await section_locator.locator('a').all()
 
-            for link in link_locator:
-                href = await link.get_attribute('href')
+            title_locator = await page.locator('h2').all()
+
+            for title in title_locator:
+                link_locator = title.locator('a')
+                await link_locator.wait_for()
+                href = await link_locator.get_attribute('href')
                 if not href:
                     continue
 
-                log_info(f" ---> {href}")
                 if "facebook.com" in href:
-                    log_info(f"Facebook link found: {href}")
-                    
+                    # log_info(f"Facebook title found: {href}")
                     facebook_url = href.rstrip('/')
-                    log_info(f"Cleaned up facebook url: {facebook_url}")
-                    
+
                     if "/people/" in facebook_url or "/groups/" in facebook_url:
                         about_url = facebook_url + "/?sk=about"
                     else:
                         about_url = facebook_url + "/about"
                     
                     log_info(f"Constructed About page URL: {about_url}")
+
+                    await extract_email_from_facebook_page(corp, about_url, page)
+                    break
             break 
+        except TimeoutError as e:
+            log_error(f"Timeout error on {corp_name}: {e}")
         except PlaywrightError as e:
-            log_error(f"Proxy or navigation error with {current_proxy} for {corp_name}: {e}")
-            if page:
-                screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
-                await page.screenshot(path=screenshot_path)
-                log_error(f"Screenshot saved to {screenshot_path}")
-                exit(0)
+            log_error(f"Proxy or navigation error with {current_proxy} for {corp_name}: {e}. Selecting a new proxy and trying again.")
+            # if page:
+            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
+            #     await page.screenshot(path=screenshot_path)
+            #     log_error(f"Screenshot saved to {screenshot_path}")
+            #     exit(0)
+            current_proxy = choice(proxies_list)
         except Exception as e:
-            log_error(f"An unexpected error occurred while processing {corp_name}: {e}")
-            break 
+            log_error(f"An unexpected error occurred while processing {corp_name}: {e}. Selecting a new proxy and trying agian.")
+            # if page:
+            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
+            #     await page.screenshot(path=screenshot_path)
+            #     log_error(f"Screenshot saved to {screenshot_path}")
+            #     exit(0)
+            current_proxy = choice(proxies_list)
         finally:
             if browser:
                 await browser.close()
+

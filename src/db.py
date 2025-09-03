@@ -6,6 +6,7 @@ from .logger import log_info, log_error
 import psycopg2
 import psycopg2.extras
 from psycopg2 import sql
+import asyncpg
 
 def get_db_connection():
     try:
@@ -20,6 +21,20 @@ def get_db_connection():
     except psycopg2.OperationalError as e:
         log_error(f"Could not connect to the databse: {e}")
         return None
+
+DB_POOL = None
+
+async def init_db_pool():
+    """Initializes the async database connection pool."""
+    global DB_POOL
+    if DB_POOL is None:
+        DB_POOL = await asyncpg.create_pool(
+            host="sunbiz-db",
+            database=getenv("POSTGRES_DB"),
+            user=getenv("POSTGRES_USER"),
+            password=getenv("POSTGRES_PASSWORD")
+        )
+    return DB_POOL
 
 def setup_db_tables(conn):
     with conn.cursor() as cur:
@@ -157,26 +172,80 @@ def update_company_category(conn, corporation_number, new_category):
 
     return updated_rows > 0
 
-import psycopg2.extras
+# def _get_listed_corporations(conn):
+#     listed_corporations = []
+#     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+#         sql_query = "SELECT corporation_number, corporation_name, category, email, facebook_url, phone_number, contacted, unsubscribed FROM companies WHERE category IS NOT NULL AND category <> %s;"
+#         cur.execute(sql_query, ('Unlisted',))
+#         listed_corporations = cur.fetchall()
+#         return listed_corporations
 
 def get_listed_corporations(conn):
     listed_corporations = []
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         sql_query = """
-            SELECT 
-                corporation_number, 
-                corporation_name, 
-                category, 
-                email, 
-                facebook_url, 
-                phone_number, 
-                contacted, 
-                unsubscribed 
-            FROM 
-                companies 
-            WHERE 
-                category IS NOT NULL AND category <> %s;
+            SELECT
+                corporation_number, corporation_name, category, email,
+                facebook_url, phone_number, contacted, unsubscribed
+            FROM
+                companies
+            WHERE
+                category IS NOT NULL
+                AND category <> %s
+                AND email IS NULL
+                AND facebook_url IS NULL;
         """
         cur.execute(sql_query, ('Unlisted',))
         listed_corporations = cur.fetchall()
-        return listed_corporations
+        
+    return listed_corporations
+
+# def update_company(conn, corporation_number, **kwargs) -> bool:
+#     if not kwargs:
+#         log_info("No fields to update.")
+#         return False
+#     set_clause = sql.SQL(', ').join(
+#         sql.SQL("{} = %s").format(sql.Identifier(key)) for key in kwargs.keys()
+#     )
+#     query = sql.SQL("UPDATE companies SET {} WHERE corporation_number = %s").format(
+#         set_clause
+#     )
+#     values = list(kwargs.values()) + [corporation_number]
+#     try:
+#         with conn.cursor() as cur:
+#             cur.execute(query, values)
+#             conn.commit() # Don't forget to commit the transaction!
+#             if cur.rowcount == 0:
+#                 log_info(f"Warning: No company found with corporation_number {corporation_number}.")
+#                 return False
+#             return True # Return True on success
+#     except (Exception, psycopg2.Error) as error:
+#         log_info(f"Error updating company: {error}")
+#         conn.rollback() # Rollback the transaction on error
+#         return False
+async def update_company_async(corporation_number: str, **kwargs) -> bool:
+    if not kwargs:
+        log_info("No fields to update.")
+        return False
+
+    pool = await init_db_pool() # Ensures pool is ready
+
+    set_clauses = [f'"{key}" = ${i+1}' for i, key in enumerate(kwargs.keys())]
+    
+    query = f"UPDATE companies SET {', '.join(set_clauses)} WHERE corporation_number = ${len(kwargs) + 1}"
+    
+    values = list(kwargs.values()) + [corporation_number]
+
+    try:
+        async with pool.acquire() as conn:
+            result = await conn.execute(query, *values)
+            rows_updated = int(result.split(' ')[1])
+            
+            if rows_updated == 0:
+                log_info(f"Warning: No company found with corporation_number {corporation_number}.")
+                return False
+            return True
+            
+    except Exception as error:
+        log_info(f"Error in async update for {corporation_number}: {error}")
+        return False

@@ -16,8 +16,8 @@ def parse_sunbiz_file(conn, input_file):
                 corp_num_and_name = parts[0]
                 corp_num = corp_num_and_name[:12].strip()
                 corp_name = corp_num_and_name[12:].strip().replace('\0', '')
-                filing_type = parts[1].strip().replace('\0', '')
-                address = ' '.join(parts[2:]).strip().replace('\0','')
+                # filing_type = parts[1].strip().replace('\0', '')
+                # address = ' '.join(parts[2:]).strip().replace('\0','')
                 data = {
                     'corp_number': corp_num,
                     'name': corp_name,
