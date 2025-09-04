@@ -1,0 +1,12 @@
+pysftp
+beautifulsoup4
+requests[socks]
+python-dotenv
+html5lib
+selenium
+paramiko<3
+psycopg2-binary
+sendgrid
+playwright
+playwright-stealth
+asyncpg
