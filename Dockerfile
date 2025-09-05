@@ -1,12 +1,6 @@
 FROM python:3.12-slim
 
-RUN apt-get update && \
-    apt-get install -y \
-    cron \
-    tzdata \
-    zlib1g-dev &&\
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y cron tzdata zlib1g-dev rsyslog && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV TZ=Etc/UTC
 
@@ -26,7 +20,9 @@ RUN chmod 0644 /etc/cron.d/my-cron-job
 
 RUN touch /var/log/cron.log
 
-CMD ["cron", "-f"]
+RUN chmod 0666 /var/log/cron.log
+
+CMD ["sh", "-c", "rsyslogd && cron && tail -f /var/log/syslog"]
 
 # FROM python:3.12-slim
 
