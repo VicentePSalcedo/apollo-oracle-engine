@@ -9,7 +9,7 @@ monitor:
 reset:
     docker-compose down -v
 
-test: reset up monitor
+test: up monitor
 
 up:
     docker-compose up --build -d

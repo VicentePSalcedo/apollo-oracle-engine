@@ -4,9 +4,9 @@ from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
 from time import sleep
 
-from src.sendgrid_util import send_single_email
+from src.sendgrid_util import send_single_email, personalize_email
 from src.logger import log_error, log_info
-from src.db import get_db_connection, has_file_processed, mark_corp_contacted, setup_db_tables, get_uncontacted_corps, update_file_status
+from src.db import get_db_connection, has_file_processed, mark_corp_contacted, setup_db_tables, get_uncontacted_corps_with_email, update_file_status
 from src.sunbiz_fetcher import download_sunbiz_file
 from src.sunbiz_parser import parse_sunbiz_file
 from src.corporation_categorizer import categorize_corporations
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     TEST_EMAIL = getenv("TEST_EMAIL")
     if TEST_EMAIL:
         log_error("TEST_EMAIL IS SET. RUNNING IN TEST MODE")
-        sleep(30)
+        # sleep(10)
 
     current_date = datetime(int(YEAR), int(MONTH), int(DAY)).date()
     today = date.today()
@@ -71,24 +71,33 @@ if __name__ == "__main__":
         exit(0)
 
     while emails_sent < int(TARGET) and current_date <= today:
-        uncontacted_corps = get_uncontacted_corps(conn)
+        uncontacted_corps = get_uncontacted_corps_with_email(conn)
 
         for corp in uncontacted_corps:
+            subject_template = "How to get more clients for {{{Business Name}}}"
+            subject = personalize_email(
+                template=subject_template,
+                business_name=corp['corporation_name']
+            )
+            email_address = None
+
             if TEST_EMAIL:
-                subject = corp['email']
-                send_single_email(
-                    sg_client=sg,
-                    email_address=TEST_EMAIL,
-                    html_template_path="/app/blank.html",
-                    from_email=FROM_EMAIL,
-                    subject=subject
-                )
-                mark_corp_contacted(conn, corp['corporation_number'], False)
-                emails_sent += 1
+                email_address = TEST_EMAIL
             else:
-                send_single_email(sg, corp['email'], "/app/blank.html", FROM_EMAIL, corp['email'])
-                mark_corp_contacted(conn, corp['corporation_number'], True)
-                emails_sent += 1
+                email_address = corp["email"]
+
+            send_single_email(
+                sg_client=sg,
+                email_address=email_address,
+                html_template_path="/app/blank.html",
+                from_email=FROM_EMAIL,
+                subject=subject,
+                business_name=corp['corporation_name']
+            )
+            mark_corp_contacted(conn, corp['corporation_number'], True)
+            emails_sent += 1
+            sleep(1)
+
             if emails_sent >= int(TARGET):
                 break
         if emails_sent >= int(TARGET):

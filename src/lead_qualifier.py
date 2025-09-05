@@ -4,13 +4,14 @@ from random import choice
 from urllib.parse import quote
 from re import compile
 
-from .db import get_listed_corporations, update_company_async
+from .sendgrid_util import clean_company_name
+
+from .db import get_listed_corporations_and_unqualified, update_company_async
 from .logger import log_info, log_error
 
 from playwright.async_api import async_playwright, Playwright, Error as PlaywrightError, TimeoutError
 from playwright_stealth import Stealth
 
-MAX_RETRIES = 10
 
 def load_proxies_from_env():
     PROXIES_STRING = getenv("PROXY_LIST")
@@ -20,6 +21,7 @@ def load_proxies_from_env():
     return PROXIES_STRING.split(',')
 
 proxies_list = load_proxies_from_env() 
+MAX_RETRIES = len(proxies_list)
 
 # async def qualify_leads_sequentially(conn):
 #     listed_corporations = get_listed_corporations(conn)
@@ -40,7 +42,7 @@ async def qualify_leads_in_parallel(conn):
     max_workers = 5
     delay_between_tasks = 2
     semaphore = asyncio.Semaphore(max_workers)
-    listed_corporations = get_listed_corporations(conn)
+    listed_corporations = get_listed_corporations_and_unqualified(conn)
     # tasks = [worker(corp, semaphore) for corp in listed_corporations]
     tasks = []
     for corp in listed_corporations:
@@ -90,7 +92,7 @@ async def extract_email_from_facebook_page(corp, url, page):
 async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
     corp_name = corp['corporation_name']
 
-    log_info(f"Processing {corp_name} with Playwright")
+    log_info(f"Processing {clean_company_name(corp_name)} with Playwright")
 
     query = f"{corp_name} Florida"
     search_url = f"https://duckduckgo.com/?q={quote(query)}"

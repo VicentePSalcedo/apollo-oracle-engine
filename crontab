@@ -1,0 +1,5 @@
+# 30 10 * * 1 /usr/local/bin/python /app/main.py >> /var/log/cron.log 2>&1
+# Test Line below
+* * * * * /usr/local/bin/python /app/main.py >> /var/log/cron.log 2>&1
+
+# Crontabs require a newline at the end of the file

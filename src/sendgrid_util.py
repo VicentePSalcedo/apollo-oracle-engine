@@ -1,32 +1,40 @@
 from sendgrid.helpers.mail import Mail, Asm
 from .logger import log_info, log_error
 
-def send_single_email(sg_client, email_address, html_template_path, from_email, subject, asm_group_id=None):
-    """
-    Sends a single test email to a specified address.
+def clean_company_name(company_name):
+    suffixes_to_remove = {"llc", "l.l.c.", "l.l.c", "pa", "inc", "inc."}
+    name_no_commas = company_name.replace(',', '')
+    words = name_no_commas.split()
+    if words and words[-1].lower() in suffixes_to_remove:
+        words.pop() # Remove the last word
+    cleaned_name = " ".join(words).strip().title()
+    return cleaned_name
 
-    :param email_address: The recipient's email address.
-    :param html_template_path: Path to the HTML email template.
-    :param from_email: The sender's email address.
-    :param subject: The email subject.
-    :param asm_group_id: The ID of the unsubscribe group to use.
-    :param dynamic_template_data: A dictionary of dynamic data to pass to the template.
-    """
+def personalize_email(template, business_name):
+    business_name = clean_company_name(business_name)
+    return template.replace("{{{Business Name}}}", business_name)
+
+def send_single_email(sg_client, email_address, html_template_path, from_email, subject, business_name, asm_group_id=None):
     try:
         with open(html_template_path, 'r') as f:
-            html_content = f.read()
+            html_template = f.read()
     except FileNotFoundError:
         log_error(f"Error: Template file not found at {html_template_path}")
-        return
+        exit(0)
 
     log_info(f"--- Preparing to send a single test email to {email_address} ---")
 
+    html_content = personalize_email(
+        template=html_template,
+        business_name=business_name
+    )
     message = Mail(
         from_email=from_email,
         to_emails=email_address,
         subject=subject,
         html_content=html_content
     )
+
     if asm_group_id:
         message.asm = Asm(group_id=int(asm_group_id))
         message.add_personalization

@@ -60,10 +60,28 @@ def setup_db_tables(conn):
         conn.commit()
     log_info("All database tables are ready.")
 
-def get_uncontacted_corps(conn):
+def get_uncontacted_corps_with_email(conn):
+    """
+    Retrieves corporations that have not been contacted and have a valid email address.
+    """
     uncontacted_corporations = []
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        sql_query = "SELECT companies.corporation_number, corporation_name, category, email, facebook_url, phone_number, contacted, unsubscribed FROM companies WHERE contacted = %s;"
+        # Updated SQL query to filter for non-null and non-empty emails
+        sql_query = """
+            SELECT 
+                companies.corporation_number, 
+                corporation_name, 
+                category, 
+                email, 
+                facebook_url, 
+                phone_number, 
+                contacted, 
+                unsubscribed 
+            FROM 
+                companies 
+            WHERE 
+                contacted = %s AND email IS NOT NULL AND email != '';
+        """
         cur.execute(sql_query, (False,))
         uncontacted_corporations = cur.fetchall()
         return uncontacted_corporations
@@ -172,15 +190,7 @@ def update_company_category(conn, corporation_number, new_category):
 
     return updated_rows > 0
 
-# def _get_listed_corporations(conn):
-#     listed_corporations = []
-#     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-#         sql_query = "SELECT corporation_number, corporation_name, category, email, facebook_url, phone_number, contacted, unsubscribed FROM companies WHERE category IS NOT NULL AND category <> %s;"
-#         cur.execute(sql_query, ('Unlisted',))
-#         listed_corporations = cur.fetchall()
-#         return listed_corporations
-
-def get_listed_corporations(conn):
+def get_listed_corporations_and_unqualified(conn):
     listed_corporations = []
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         sql_query = """
@@ -200,29 +210,6 @@ def get_listed_corporations(conn):
         
     return listed_corporations
 
-# def update_company(conn, corporation_number, **kwargs) -> bool:
-#     if not kwargs:
-#         log_info("No fields to update.")
-#         return False
-#     set_clause = sql.SQL(', ').join(
-#         sql.SQL("{} = %s").format(sql.Identifier(key)) for key in kwargs.keys()
-#     )
-#     query = sql.SQL("UPDATE companies SET {} WHERE corporation_number = %s").format(
-#         set_clause
-#     )
-#     values = list(kwargs.values()) + [corporation_number]
-#     try:
-#         with conn.cursor() as cur:
-#             cur.execute(query, values)
-#             conn.commit() # Don't forget to commit the transaction!
-#             if cur.rowcount == 0:
-#                 log_info(f"Warning: No company found with corporation_number {corporation_number}.")
-#                 return False
-#             return True # Return True on success
-#     except (Exception, psycopg2.Error) as error:
-#         log_info(f"Error updating company: {error}")
-#         conn.rollback() # Rollback the transaction on error
-#         return False
 async def update_company_async(corporation_number: str, **kwargs) -> bool:
     if not kwargs:
         log_info("No fields to update.")
