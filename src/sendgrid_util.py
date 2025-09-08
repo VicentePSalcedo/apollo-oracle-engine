@@ -45,3 +45,4 @@ def send_single_email(sg_client, email_address, html_template_path, from_email, 
         log_info("  -> Check your inbox to see the test email.")
     except Exception as e:
         log_error(f"  -> Failed to send. Error: {e}\nBody: {e.body}")
+        exit(0)
