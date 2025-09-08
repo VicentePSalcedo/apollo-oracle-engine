@@ -22,24 +22,10 @@ RUN touch /var/log/cron.log
 
 RUN chmod 0666 /var/log/cron.log
 
-CMD ["sh", "-c", "rsyslogd && cron && tail -f /var/log/syslog"]
+COPY start.sh /start.sh
 
-# FROM python:3.12-slim
+RUN chmod +x /start.sh
 
-# RUN apt-get update && \
-#     apt-get install -y \
-#     zlib1g-dev &&\
-#     apt-get clean && \
-#     rm -rf /var/lib/apt/lists/*
+CMD ["/start.sh"]
 
-# WORKDIR /app
-
-# COPY requirements.txt .
-
-# RUN pip install --no-cache-dir -r requirements.txt
-
-# RUN playwright install --with-deps
-
-# COPY . .
-
-# CMD ["python", "main.py"]
+# CMD ["sh", "-c", "rsyslogd && cron && tail -f /var/log/syslog"]
