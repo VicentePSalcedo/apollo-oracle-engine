@@ -7,8 +7,8 @@ monitor:
     docker compose logs -f app
 
 run script:
-    @docker exec -d python_app_container python /app/{{script}}
-    @just monitor
+    docker exec -d python_app_container python /app/{{script}}
+    just monitor
 
 reset:
     docker-compose down -v
