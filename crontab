@@ -1,4 +1,4 @@
 # Runs at 10:30 AM every day
-30 11 * * * /usr/local/bin/python /app/main.py >> /var/log/syslog 2>&1
+30 11 * * * root /usr/local/bin/python /app/main.py >> /var/log/syslog 2>&1
 
 # Crontabs require a newline at the end of the file
