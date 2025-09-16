@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
 from time import sleep
 
-from src.sendgrid_util import send_single_email, personalize_email
+from src.sendgrid_util import send_single_email
 from src.logger import log_error, log_info
 from src.db import get_db_connection, has_file_processed, mark_corp_contacted, setup_db_tables, get_uncontacted_corps_with_email, update_file_status
 from src.sunbiz_fetcher import download_sunbiz_file
@@ -74,11 +74,7 @@ if __name__ == "__main__":
         uncontacted_corps = get_uncontacted_corps_with_email(conn)
 
         for corp in uncontacted_corps:
-            subject_template = "How to get more clients for {{{Business Name}}}"
-            subject = personalize_email(
-                template=subject_template,
-                business_name=corp['corporation_name']
-            )
+            subject = "Your Local Web & IT Partner"
             email_address = None
 
             if TEST_EMAIL:
