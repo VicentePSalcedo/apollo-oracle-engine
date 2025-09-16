@@ -16,7 +16,7 @@ run script:
 reset:
     docker-compose down -v
 
-test: up run-now monitor
+test: up run-now
 
 up:
     docker-compose up --build -d

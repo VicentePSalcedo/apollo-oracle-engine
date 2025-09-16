@@ -35,9 +35,7 @@ def personalize_email(template, business_name):
     return template.replace("{{{Business Name}}}", business_name)
 
 def send_single_email(sg_client, email_address, html_template_path, from_email, subject, business_name, asm_group_id=None):
-    if not validate_email(sg_client, email_address):
-        log_info(f"Email validation failed for {email_address}. Skipping send.")
-        return
+    
 
     try:
         with open(html_template_path, 'r') as f:
