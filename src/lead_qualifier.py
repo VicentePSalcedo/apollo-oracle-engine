@@ -6,7 +6,7 @@ from re import compile
 
 from .sendgrid_util import clean_company_name
 
-from .db import get_listed_corporations_and_unqualified, update_company_async
+from .db import get_unqualified_corporations, update_company_async
 from .logger import log_info, log_error
 
 from playwright.async_api import async_playwright, Playwright, Error as PlaywrightError, TimeoutError
