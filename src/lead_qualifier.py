@@ -21,7 +21,7 @@ def load_proxies_from_env():
     return PROXIES_STRING.split(',')
 
 proxies_list = load_proxies_from_env() 
-MAX_RETRIES = len(proxies_list)
+MAX_RETRIES = 10
 
 # async def qualify_leads_sequentially(conn):
 #     listed_corporations = get_listed_corporations(conn)
@@ -136,6 +136,9 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
                     continue
 
                 if "facebook.com" in href:
+                    if "/posts/" in href or "/videos/" in href or "/photos/" in href or "/story.php" in href:
+                        log_info(f"Skipping Facebook post link: {href}")
+                        continue
                     # log_info(f"Facebook title found: {href}")
                     facebook_url = href.rstrip('/')
 
