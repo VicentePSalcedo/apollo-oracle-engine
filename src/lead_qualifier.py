@@ -13,15 +13,29 @@ from playwright.async_api import async_playwright, Playwright, Error as Playwrig
 from playwright_stealth import Stealth
 
 
-def load_proxies_from_env():
-    PROXIES_STRING = getenv("PROXY_LIST")
-    if not PROXIES_STRING:
-        log_info("Missing PROXIES_STRING environment variable.")
-        exit(0)
-    return PROXIES_STRING.split(',')
+def load_proxies_from_env(file_path='Webshare 100 proxies.txt') -> list[str]:
+    formatted_proxies = []
+    try:
+        with open(file_path, 'r') as file:
+            for line in file:
+                clean_line = line.strip()
+                if clean_line:
+                    parts = clean_line.split(':')
+                    # Ensure the line has at least an IP and a port
+                    if len(parts) >= 2:
+                        ip_address = parts[0]
+                        port = parts[1]
+                        # Add the formatted string to our list
+                        formatted_proxies.append(f"http://{ip_address}:{port}")
+    except FileNotFoundError:
+        print(f"Error: The file at '{file_path}' was not found.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+    return formatted_proxies
 
 proxies_list = load_proxies_from_env() 
-MAX_RETRIES = 10
+MAX_RETRIES = 5
 
 # async def qualify_leads_sequentially(conn):
 #     listed_corporations = get_listed_corporations(conn)
