@@ -3,7 +3,7 @@ default: test
 commit:
     git status
     git add .
-    git commit -m "quick update"
+    gemini -p "Write a git commit for the staged changes and commit them."
     git push
 
 down:
