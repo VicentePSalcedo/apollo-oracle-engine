@@ -39,7 +39,7 @@ async def worker(corp, semaphore):
         # log_info(f"Semaphore released for {corp_name}")
 
 async def qualify_leads_in_parallel(conn):
-    max_workers = 5
+    max_workers = 10
     delay_between_tasks = 2
     semaphore = asyncio.Semaphore(max_workers)
     listed_corporations = get_unqualified_corporations(conn)
