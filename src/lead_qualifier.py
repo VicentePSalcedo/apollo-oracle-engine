@@ -21,11 +21,9 @@ def load_proxies_from_env(file_path='Webshare 100 proxies.txt') -> list[str]:
                 clean_line = line.strip()
                 if clean_line:
                     parts = clean_line.split(':')
-                    # Ensure the line has at least an IP and a port
                     if len(parts) >= 2:
                         ip_address = parts[0]
                         port = parts[1]
-                        # Add the formatted string to our list
                         formatted_proxies.append(f"http://{ip_address}:{port}")
     except FileNotFoundError:
         print(f"Error: The file at '{file_path}' was not found.")
@@ -45,19 +43,15 @@ MAX_RETRIES = 5
 #     return
 
 async def worker(corp, semaphore):
-    # corp_name = corp['corporation_name']
     async with semaphore:
-        # log_info(f"Semaphore acquired for {corp_name}.")
         async with Stealth().use_async(async_playwright()) as p:
             await qualify_lead_playwright(corp, p)
-        # log_info(f"Semaphore released for {corp_name}")
 
 async def qualify_leads_in_parallel(conn):
-    max_workers = 10
+    max_workers = 3
     delay_between_tasks = 2
     semaphore = asyncio.Semaphore(max_workers)
     listed_corporations = get_unqualified_corporations(conn)
-    # tasks = [worker(corp, semaphore) for corp in listed_corporations]
     tasks = []
     for corp in listed_corporations:
         task = asyncio.create_task(worker(corp, semaphore))
