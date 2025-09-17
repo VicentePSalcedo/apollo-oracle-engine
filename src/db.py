@@ -190,7 +190,7 @@ def update_company_category(conn, corporation_number, new_category):
 
     return updated_rows > 0
 
-def get_listed_corporations_and_unqualified(conn):
+def get_unqualified_corporations(conn):
     listed_corporations = []
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         sql_query = """
@@ -201,11 +201,10 @@ def get_listed_corporations_and_unqualified(conn):
                 companies
             WHERE
                 category IS NOT NULL
-                AND category <> %s
                 AND email IS NULL
                 AND facebook_url IS NULL;
         """
-        cur.execute(sql_query, ('Unlisted',))
+        cur.execute(sql_query)
         listed_corporations = cur.fetchall()
         
     return listed_corporations

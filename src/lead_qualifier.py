@@ -6,22 +6,36 @@ from re import compile
 
 from .sendgrid_util import clean_company_name
 
-from .db import get_listed_corporations_and_unqualified, update_company_async
+from .db import get_unqualified_corporations, update_company_async
 from .logger import log_info, log_error
 
 from playwright.async_api import async_playwright, Playwright, Error as PlaywrightError, TimeoutError
 from playwright_stealth import Stealth
 
 
-def load_proxies_from_env():
-    PROXIES_STRING = getenv("PROXY_LIST")
-    if not PROXIES_STRING:
-        log_info("Missing PROXIES_STRING environment variable.")
-        exit(0)
-    return PROXIES_STRING.split(',')
+def load_proxies_from_env(file_path='Webshare 100 proxies.txt') -> list[str]:
+    formatted_proxies = []
+    try:
+        with open(file_path, 'r') as file:
+            for line in file:
+                clean_line = line.strip()
+                if clean_line:
+                    parts = clean_line.split(':')
+                    # Ensure the line has at least an IP and a port
+                    if len(parts) >= 2:
+                        ip_address = parts[0]
+                        port = parts[1]
+                        # Add the formatted string to our list
+                        formatted_proxies.append(f"http://{ip_address}:{port}")
+    except FileNotFoundError:
+        print(f"Error: The file at '{file_path}' was not found.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+    return formatted_proxies
 
 proxies_list = load_proxies_from_env() 
-MAX_RETRIES = len(proxies_list)
+MAX_RETRIES = 5
 
 # async def qualify_leads_sequentially(conn):
 #     listed_corporations = get_listed_corporations(conn)
@@ -39,10 +53,10 @@ async def worker(corp, semaphore):
         # log_info(f"Semaphore released for {corp_name}")
 
 async def qualify_leads_in_parallel(conn):
-    max_workers = 5
+    max_workers = 10
     delay_between_tasks = 2
     semaphore = asyncio.Semaphore(max_workers)
-    listed_corporations = get_listed_corporations_and_unqualified(conn)
+    listed_corporations = get_unqualified_corporations(conn)
     # tasks = [worker(corp, semaphore) for corp in listed_corporations]
     tasks = []
     for corp in listed_corporations:
@@ -136,6 +150,9 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
                     continue
 
                 if "facebook.com" in href:
+                    if "/posts/" in href or "/videos/" in href or "/photos/" in href or "/story.php" in href:
+                        log_info(f"Skipping Facebook post link: {href}")
+                        continue
                     # log_info(f"Facebook title found: {href}")
                     facebook_url = href.rstrip('/')
 

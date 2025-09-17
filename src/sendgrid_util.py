@@ -1,5 +1,25 @@
+import json
 from sendgrid.helpers.mail import Mail, Asm
 from .logger import log_info, log_error
+
+def validate_email(sg_client, email_address):
+    try:
+        response = sg_client.client.validations.email.post(
+            request_body={
+                'email': email_address
+            }
+        )
+        if response.status_code == 200:
+            response_body = json.loads(response.body.decode('utf-8'))
+            verdict = response_body.get('result', {}).get('verdict')
+            log_info(f"Email validation for {email_address}: {verdict}")
+            return verdict == 'Valid'
+        else:
+            log_error(f"Email validation API returned status {response.status_code} for {email_address}")
+            return False
+    except Exception as e:
+        log_error(f"An error occurred during email validation: {e}")
+        return False
 
 def clean_company_name(company_name):
     suffixes_to_remove = {"llc", "l.l.c.", "l.l.c", "pa", "inc", "inc."}
@@ -15,6 +35,8 @@ def personalize_email(template, business_name):
     return template.replace("{{{Business Name}}}", business_name)
 
 def send_single_email(sg_client, email_address, html_template_path, from_email, subject, business_name, asm_group_id=None):
+    
+
     try:
         with open(html_template_path, 'r') as f:
             html_template = f.read()
