@@ -10,7 +10,7 @@ from src.db import get_db_connection, has_file_processed, mark_corp_contacted, s
 from src.sunbiz_fetcher import download_sunbiz_file
 from src.sunbiz_parser import parse_sunbiz_file
 from src.corporation_categorizer import categorize_corporations
-from src.lead_qualifier import qualify_leads_in_parallel #, qualify_leads_sequentially
+from src.lead_qualifier import qualify_leads_in_parallel, qualify_leads_sequentially
 
 from sendgrid import SendGridAPIClient
 
@@ -26,8 +26,8 @@ def main_workflow(conn, input_file_path) -> None:
     categorize_corporations(conn)
 
     log_info("Qualifying new categorized leads.")
-    # asyncio.run(qualify_leads_sequentially(conn))
-    asyncio.run(qualify_leads_in_parallel(conn))
+    asyncio.run(qualify_leads_sequentially(conn))
+    # asyncio.run(qualify_leads_in_parallel(conn))
     
     log_info(f"{input_file_path} processed")
 
