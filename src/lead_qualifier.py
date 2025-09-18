@@ -67,7 +67,6 @@ async def extract_email_from_facebook_page(corp, url, page):
     email_regex = compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}') 
 
     for _ in range(MAX_RETRIES):
-        # try:
         await page.goto(url, timeout=30000)
         email_locator = page.get_by_text(email_regex)
 
@@ -91,10 +90,10 @@ async def extract_email_from_facebook_page(corp, url, page):
             log_info(f"Page loaded, but no email found for '{corp_name}'.")
             return
 
-        # except TimeoutError:
-        #     log_error(f"Timeout while trying to load Facebook about page: {url}. Attempt {attempt + 2}")
-        # except Exception as e:
-        #     log_error(f"An error occurred on Facebook page {url}: {e}. Attempt {attempt + 2}")
+def choose_proxy():
+    current_proxy = choice(proxies_list)
+    log_info(f"Connecting via {current_proxy}.")
+    return current_proxy
 
 async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
     corp_name = corp['corporation_name']
@@ -104,7 +103,7 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
     query = f"{corp_name} Florida"
     search_url = f"https://duckduckgo.com/?q={quote(query)}"
     browser = None
-    current_proxy = choice(proxies_list)
+    current_proxy = choose_proxy()
 
     WEBSHARE_USERNAME = getenv("WEBSHARE_USERNAME")
     if not WEBSHARE_USERNAME:
@@ -160,13 +159,13 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
             break 
         except TimeoutError as e:
             log_error(f"Timeout error on {corp_name}: {e}. Selecting a new proxy and trying again...")
-            current_proxy = choice(proxies_list)
+            current_proxy = choose_proxy()
         except PlaywrightError as e:
             log_error(f"Proxy or navigation error with {current_proxy} for {corp_name}: {e}. Selecting a new proxy and trying again...")
-            current_proxy = choice(proxies_list)
+            current_proxy = choose_proxy()
         except Exception as e:
             log_error(f"An unexpected error occurred while processing {corp_name}: {e}. Selecting a new proxy and trying agian...")
-            current_proxy = choice(proxies_list)
+            current_proxy = choose_proxy()
         finally:
             if browser:
                 await browser.close()
