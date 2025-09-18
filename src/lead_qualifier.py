@@ -66,53 +66,40 @@ async def extract_email_from_facebook_page(corp, url, page):
     corp_num = corp['corporation_number']
     email_regex = compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}') 
 
-    for attempt in range(MAX_RETRIES):
+    for _ in range(MAX_RETRIES):
+        # try:
+        await page.goto(url, timeout=30000)
+        email_locator = page.get_by_text(email_regex)
 
-        log_info(f"Attempt {attempt + 1} of {MAX_RETRIES} to find email on facebook page.")
+        await asyncio.sleep(2)
 
-        try:
-            await page.goto(url, timeout=30000)
-            email_locator = page.get_by_text(email_regex)
+        
+        if await email_locator.count() > 0:
+            email_address = await email_locator.first.inner_text()
 
-            await asyncio.sleep(2)
+            log_info(f"Email for {corp_name} is: {email_address}")
 
-            
-            if await email_locator.count() > 0:
-                email_address = await email_locator.first.inner_text()
+            await update_company_async(
+                corp_num,
+                email=email_address,
+                facebook_url=url,
+                contacted=False,
+                unsubscribed=False
+            )
+            return
+        else:
+            log_info(f"Page loaded, but no email found for '{corp_name}'.")
+            return
 
-                log_info(f"Email for {corp_name} is: {email_address}")
-
-                await update_company_async(
-                    corp_num,
-                    email=email_address,
-                    facebook_url=url,
-                    contacted=False,
-                    unsubscribed=False
-                )
-                return
-            else:
-                log_info(f"Page loaded, but no email found for '{corp_name}'.")
-                return
-
-        except TimeoutError:
-            log_error(f"Timeout while trying to load Facebook about page: {url}")
-            # if page:
-            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
-            #     await page.screenshot(path=screenshot_path)
-            #     log_error(f"Screenshot saved to {screenshot_path}")
-            #     exit(0)
-        except Exception as e:
-            log_error(f"An error occurred on Facebook page {url}: {e}")
-            # if page:
-            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
-            #     await page.screenshot(path=screenshot_path)
-            #     log_error(f"Screenshot saved to {screenshot_path}")
-            #     exit(0)
+        # except TimeoutError:
+        #     log_error(f"Timeout while trying to load Facebook about page: {url}. Attempt {attempt + 2}")
+        # except Exception as e:
+        #     log_error(f"An error occurred on Facebook page {url}: {e}. Attempt {attempt + 2}")
 
 async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
     corp_name = corp['corporation_name']
 
-    log_info(f"Processing {clean_company_name(corp_name)} with Playwright")
+    log_info(f"Processing {clean_company_name(corp_name)}")
 
     query = f"{corp_name} Florida"
     search_url = f"https://duckduckgo.com/?q={quote(query)}"
@@ -129,7 +116,7 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
         log_error("Missing WEBSHARE_PASSWORD environment variable.")
         exit(0)
 
-    for attempt in range(MAX_RETRIES):
+    for _ in range(MAX_RETRIES):
         page = None
 
         try:
@@ -142,7 +129,7 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
                 }
             )
             page = await browser.new_page()
-            await page.goto(search_url, timeout=30000) # 30-second timeout
+            await page.goto(search_url, timeout=30000)
 
             title_locator = await page.locator('h2').all()
             for title in title_locator:
@@ -158,12 +145,9 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
                         continue
         
                     facebook_url = href.rstrip('/')
-
-                    # Check if the URL already leads to an about page
                     if "/about" in facebook_url or "?sk=about" in facebook_url:
                         about_url = facebook_url
                     else:
-                        # If not, construct the correct about page URL
                         if "/people/" in facebook_url or "/groups/" in facebook_url:
                             about_url = facebook_url + "/?sk=about"
                         else:
@@ -175,23 +159,13 @@ async def qualify_lead_playwright(corp: dict, p: Playwright) -> None:
                     break
             break 
         except TimeoutError as e:
-            log_error(f"Timeout error on {corp_name}: {e}. Attempt {attempt + 1}")
+            log_error(f"Timeout error on {corp_name}: {e}. Selecting a new proxy and trying again...")
             current_proxy = choice(proxies_list)
         except PlaywrightError as e:
-            log_error(f"Proxy or navigation error with {current_proxy} for {corp_name}: {e}. Selecting a new proxy and trying again. Attempt {attempt + 1}")
-            # if page:
-            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
-            #     await page.screenshot(path=screenshot_path)
-            #     log_error(f"Screenshot saved to {screenshot_path}")
-            #     exit(0)
+            log_error(f"Proxy or navigation error with {current_proxy} for {corp_name}: {e}. Selecting a new proxy and trying again...")
             current_proxy = choice(proxies_list)
         except Exception as e:
-            log_error(f"An unexpected error occurred while processing {corp_name}: {e}. Selecting a new proxy and trying agian. Attempt {attempt + 1}")
-            # if page:
-            #     screenshot_path = f"error_{corp_name.replace(' ', '_')}.png"
-            #     await page.screenshot(path=screenshot_path)
-            #     log_error(f"Screenshot saved to {screenshot_path}")
-            #     exit(0)
+            log_error(f"An unexpected error occurred while processing {corp_name}: {e}. Selecting a new proxy and trying agian...")
             current_proxy = choice(proxies_list)
         finally:
             if browser:
