@@ -13,7 +13,7 @@ from playwright.async_api import async_playwright, Playwright, Error as Playwrig
 from playwright_stealth import Stealth
 
 
-def load_proxies_from_env(file_path='Webshare 100 proxies.txt') -> list[str]:
+def load_proxies_from_env(file_path='/app/Webshare 100 proxies.txt') -> list[str]:
     formatted_proxies = []
     try:
         with open(file_path, 'r') as file:
