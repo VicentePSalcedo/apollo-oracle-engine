@@ -64,7 +64,6 @@ def send_single_email(sg_client, email_address, html_template_path, from_email, 
     try:
         response = sg_client.send(message)
         log_info(f"  -> Sent successfully! Status code: {response.status_code}")
-        log_info("  -> Check your inbox to see the test email.")
     except Exception as e:
         log_error(f"  -> Failed to send. Error: {e}\nBody: {e.body}")
         exit(0)
