@@ -20,3 +20,6 @@ test: up run-now
 
 up:
     @docker-compose up --build -d
+
+shell:
+    @docker exec -it python_app_container /bin/bash
