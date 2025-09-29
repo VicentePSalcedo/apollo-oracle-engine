@@ -4,3 +4,4 @@ log/
 src/__pycache__
 .env
 Webshare 100 proxies.txt
+refresh_proxies.sh
