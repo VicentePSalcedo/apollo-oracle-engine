@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y cron tzdata zlib1g-dev rsyslog && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-ENV TZ=Etc/UTC
+ENV TZ=America/New_York
 
 WORKDIR /app
 
